@@ -138,6 +138,7 @@ function renderSug(){
       <th>Foto</th>
       <th>UxB</th>
       <th>Precio</th>
+      <th>% Clientes</th>
       <th></th>
     </tr>`;
 
@@ -149,6 +150,8 @@ function renderSug(){
     const uxb = pick(r,["uxb"]);
     const price = pick(r,["price_cash","precio"]);
 
+    const pctTxt = pctClientesCell(r);
+
     tbody.innerHTML += `
       <tr>
         <td>${cod}</td>
@@ -156,9 +159,11 @@ function renderSug(){
         <td>${fotoCell(cod)}</td>
         <td>${uxb}</td>
         <td>${fmtPrecio(price)}</td>
+        <td>${pctTxt}</td>
         <td>${r.texto_clientes || ""}</td>
       </tr>`;
   });
+  syncMoreButtons();
 }
 
 // ====================== NOVEDADES ======================
@@ -217,7 +222,126 @@ function renderNov(){
         <td>${fmtPrecio(price)}</td>
       </tr>`;
   });
+  syncMoreButtons();
 }
 
 // ====================== INIT ======================
 mostrar("hist");
+
+// ====================== VER MAS / VER MENOS ======================
+function syncMoreButtons() {
+  // Sugerencias
+  const moreSug = document.getElementById("btnMoreSug");
+  const lessSug = document.getElementById("btnLessSug");
+  if (moreSug && lessSug) {
+    moreSug.classList.toggle("hidden", !(sugerenciasGlobal.length > sugMostrados));
+    lessSug.classList.toggle("hidden", !(sugMostrados > 5));
+  }
+
+  // Novedades
+  const moreNov = document.getElementById("btnMoreNov");
+  const lessNov = document.getElementById("btnLessNov");
+  if (moreNov && lessNov) {
+    moreNov.classList.toggle("hidden", !(novedadesGlobal.length > novMostrados));
+    lessNov.classList.toggle("hidden", !(novMostrados > 5));
+  }
+}
+
+function verMasSug() {
+  sugMostrados = sugerenciasGlobal.length; // mostrar todo
+  renderSug();
+}
+function verMenosSug() {
+  sugMostrados = 5;
+  renderSug();
+}
+
+function verMasNov() {
+  novMostrados = novedadesGlobal.length; // mostrar todo
+  renderNov();
+}
+function verMenosNov() {
+  novMostrados = 5;
+  renderNov();
+}
+
+// ====================== % CLIENTES (con 🔥) ======================
+function pctClientesCell(r) {
+  // Intento flexible: si tu RPC ya trae porcentaje directo, lo uso
+  const pctDirecto = Number(pick(r, ["pct_clientes","porcentaje_clientes","pct","porcentaje"], ""));
+  if (!isNaN(pctDirecto) && pctDirecto !== 0) {
+    const v = Math.round(pctDirecto);
+    return `${v}%${v >= 80 ? " 🔥" : ""}`;
+  }
+
+  // Si trae "cantidad que compraron" y "total clientes", calculo
+  const buyers = Number(pick(r, ["buyers","buyers_count","clientes_compraron","cant_clientes_compraron","n_buyers"], ""));
+  const total  = Number(pick(r, ["total_clients","total_clientes","clientes_total","n_total_clients"], ""));
+
+  if (!isNaN(buyers) && !isNaN(total) && total > 0) {
+    const v = Math.round((buyers / total) * 100);
+    return `${v}%${v >= 80 ? " 🔥" : ""}`;
+  }
+
+  // si no hay datos suficientes
+  return "";
+}
+
+// ====================== PDF (pestaña actual) ======================
+function generarPdfActual() {
+  const cliente = document.getElementById("cliente")?.value?.trim() || "";
+  const fecha = new Date().toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" });
+
+  const tituloVista =
+    vista === "hist" ? "Historial" :
+    vista === "sug"  ? "Sugerencias" :
+    vista === "nov"  ? "Novedades" : "Reporte";
+
+  const tableId =
+    vista === "hist" ? "tablaHist" :
+    vista === "sug"  ? "tablaSug"  :
+    vista === "nov"  ? "tablaNov"  : "tablaHist";
+
+  const table = document.getElementById(tableId);
+  if (!table) { alert("No se encontró la tabla para exportar."); return; }
+
+  // jsPDF UMD
+  const { jsPDF } = window.jspdf || {};
+  if (!jsPDF) { alert("No se cargó jsPDF. Revisá los <script> del HTML."); return; }
+
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.text(`Loekemeyer - ${tituloVista}`, 40, 40);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(`Cliente: ${cliente || "(sin código)"}    Fecha: ${fecha}`, 40, 60);
+
+  // Extraer headers y filas desde el DOM (lo que el usuario está viendo)
+  const headers = Array.from(table.querySelectorAll("thead th")).map(th => th.innerText.trim());
+
+  const rows = Array.from(table.querySelectorAll("tbody tr")).map(tr => {
+    const tds = Array.from(tr.querySelectorAll("td"));
+    return tds.map(td => {
+      // si hay imagen, saco URL o vacío (no incrusto imagen en PDF para no hacerlo pesado)
+      const img = td.querySelector("img");
+      if (img) return ""; // o img.src si querés que salga el link
+      return (td.innerText || "").trim();
+    });
+  });
+
+  // AutoTable
+  doc.autoTable({
+    head: [headers],
+    body: rows,
+    startY: 80,
+    styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak" },
+    headStyles: { fillColor: [17,17,17] }, // queda prolijo (negro)
+    margin: { left: 40, right: 40 }
+  });
+
+  const safeCliente = (cliente || "cliente").replace(/[^\w\-]+/g, "_");
+  doc.save(`${tituloVista}_${safeCliente}.pdf`);
+}
