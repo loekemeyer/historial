@@ -99,3 +99,23 @@ thead th{
   text-align:center;
   margin-top:10px;
 }
+
+/* Columna Nota (a la derecha) */
+#tablaSug .col-note{
+  width: 360px;
+  text-align: left;
+  white-space: normal;
+  line-height: 1.2;
+  padding-left: 14px;
+}
+
+/* Header de Nota: “no negro” */
+#tablaSug thead th.col-note{
+  background: transparent !important;
+  color: transparent !important;   /* deja la “celda” pero sin texto */
+  border-bottom: 1px solid #eee !important;
+}
+
+#tablaSug td.col-note{
+  border-left: 1px solid #eee;
+}
