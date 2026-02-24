@@ -1,435 +1,223 @@
-// ================= SUPABASE =================
-const SUPABASE_URL = "https://kwkclwhmoygunqmlegrg.supabase.co";
+// ====================== CONFIG ======================
+const SUPABASE_URL = "https://flgavcfamdsodrhakqen.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_G9QvEtPwGp80_6NUneseVg_V5mfmLfY";
 
-// ⚠️ Ideal: usar la MISMA key del dominio viejo (la que te funcionaba ahí).
-// Si esto sigue fallando, cambiamos a tu ANON KEY largo (JWT) como en el sistema original.
-const SUPABASE_URL = "https://kwkclwhmoygunqmlegrg.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3a2Nsd2htb3lndW5xbWxlZ3JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MjA2NzUsImV4cCI6MjA4NTA5NjY3NX0.soqPY5hfA3RkAJ9jmIms8UtEGUc4WpZztpEbmDijOgU";
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Si tu login “por CUIT” era CUIT->email interno, definilo acá:
-const CUIT_EMAIL_DOMAIN = "clientes.local"; // <- si tu backend usaba otro, lo cambiamos
+// ⚠️ PONÉ EXACTAMENTE EL NOMBRE REAL DEL BUCKET (copiar y pegar)
+const IMG_BUCKET = "products-images"; // REVISAR MAYUSCULAS
 
-// helpers
-const $ = (id) => document.getElementById(id);
+// ====================== STATE ======================
+let vista = "hist";
+let sugerenciasGlobal = [];
+let novedadesGlobal = [];
+let sugMostrados = 5;
+let novMostrados = 5;
 
-const statusBox = $("status");
-const tabla = $("tabla");
-const thead = $("thead");
-const tbody = $("tbody");
-
-// login UI
-const loginBox = $("loginBox");
-const loginMsg = $("loginMsg");
-const btnLogin = $("btnLogin");
-const btnLogout = $("btnLogout");
-const userInput = $("user");
-const passInput = $("pass");
-
-// tabs UI
-const tabHist = $("tabHist");
-const tabSug = $("tabSug");
-const tabNov = $("tabNov");
-const panelHist = $("panelHist");
-const panelSug = $("panelSug");
-const panelNov = $("panelNov");
-
-// admin UI
-const adminBox = $("adminBox");
-const adminClientCode = $("adminClientCode");
-const btnLoadClient = $("btnLoadClient");
-const adminMsg = $("adminMsg");
-
-function setStatus(msg) {
-  statusBox.style.display = "block";
-  statusBox.innerText = msg;
-  tabla.style.display = "none";
-}
-
-function hideStatus() {
-  statusBox.style.display = "none";
-}
-
-function showLogin(msg = "") {
-  loginBox.style.display = "block";
-  loginMsg.innerText = msg;
-  btnLogout.style.display = "none";
-}
-
-function hideLogin() {
-  loginBox.style.display = "none";
-  loginMsg.innerText = "";
-  btnLogout.style.display = "inline-block";
-}
-
-function setTab(which) {
-  // activa botón
-  tabHist.classList.toggle("active", which === "hist");
-  tabSug.classList.toggle("active", which === "sug");
-  tabNov.classList.toggle("active", which === "nov");
-
-  // activa panel
-  panelHist.classList.toggle("active", which === "hist");
-  panelSug.classList.toggle("active", which === "sug");
-  panelNov.classList.toggle("active", which === "nov");
-}
-
-// ---------- sesión ----------
-async function getSessionSafe() {
-  const { data, error } = await sb.auth.getSession();
-  if (error) {
-    console.error("getSession error:", error);
-    return null;
+// ====================== HELPERS ======================
+function pick(obj, keys, fallback = ""){
+  for(const k of keys){
+    if(obj && obj[k] !== undefined && obj[k] !== null && obj[k] !== "")
+      return obj[k];
   }
-  return data?.session || null;
+  return fallback;
 }
 
-// ---------- login ----------
-function normalizeUserToEmail(user) {
-  const u = (user || "").trim();
-  if (!u) return "";
-
-  if (u.includes("@")) return u;
-
-  const onlyDigits = u.replace(/\D/g, "");
-  if (onlyDigits.length >= 10) {
-    return `${onlyDigits}@${CUIT_EMAIL_DOMAIN}`;
-  }
-  return u;
+function fmtMes(yyyy_mm){
+  if(!yyyy_mm) return "";
+  const [yyyy, mm] = yyyy_mm.split("-");
+  const meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  return `${meses[Number(mm)-1]}/${yyyy.slice(-2)}`;
 }
 
-async function doLogin() {
-  const user = (userInput.value || "").trim();
-  const password = passInput.value || "";
-
-  if (!user || !password) {
-    loginMsg.innerText = "Completá CUIT/email y contraseña.";
-    return;
-  }
-
-  loginMsg.innerText = "Ingresando...";
-  const email = normalizeUserToEmail(user);
-
-  const { data, error } = await sb.auth.signInWithPassword({ email, password });
-
-  if (error || !data?.session) {
-    console.error("Login error:", error);
-    loginMsg.innerText = "No se pudo ingresar. Verificá credenciales.";
-    return;
-  }
-
-  hideLogin();
-  await loadForSession(data.session, null); // null = default (propio cliente)
+function fmtPrecio(n){
+  const val = Number(n);
+  if(isNaN(val)) return "";
+  return val.toLocaleString("es-AR",{minimumFractionDigits:2});
 }
 
-async function doLogout() {
-  await sb.auth.signOut();
-  $("cliente").innerText = "";
-  setStatus("Sesión cerrada.");
-  showLogin("Ingresá para ver tu historial.");
-  adminBox.style.display = "none";
-  adminMsg.innerText = "";
+// ====================== IMAGEN CORRECTA ======================
+function fotoCell(cod){
+  if(!cod) return "";
+
+  const { data } = sb.storage
+    .from(IMG_BUCKET)
+    .getPublicUrl(`${cod}.jpg`);
+
+  const url = data?.publicUrl;
+
+  if(!url) return "";
+
+  return `
+    <a href="${url}" target="_blank">
+      <img class="thumb" src="${url}" />
+    </a>`;
 }
 
-// ---------- ADMIN detection ----------
-function isAdminRow(row) {
-  if (!row) return false;
-  if (row.is_admin === true) return true;
-  if (String(row.role || "").toLowerCase() === "admin") return true;
-  return false;
+// ====================== UI ======================
+function mostrar(which){
+  vista = which;
+
+  document.getElementById("modHist").classList.toggle("hidden", which !== "hist");
+  document.getElementById("modSug").classList.toggle("hidden", which !== "sug");
+  document.getElementById("modNov").classList.toggle("hidden", which !== "nov");
+
+  document.getElementById("tabHist").classList.toggle("active", which === "hist");
+  document.getElementById("tabSug").classList.toggle("active", which === "sug");
+  document.getElementById("tabNov").classList.toggle("active", which === "nov");
 }
 
-// ---------- data ----------
-async function getMeCustomer(session) {
-  // IMPORTANTE: ahora traemos is_admin y role
-  const { data, error } = await sb
-    .from("customers")
-    .select("cod_cliente, business_name, is_admin, role")
-    .eq("auth_user_id", session.user.id)
-    .maybeSingle();
+async function cargar(){
+  const cliente = document.getElementById("cliente").value.trim();
+  if(!cliente) return;
 
-  if (error) {
-    console.error("getMeCustomer error:", error);
-    return { error: "No se pudo cargar el cliente (RLS o datos)." };
-  }
-  if (!data) {
-    return { error: "No se encontró tu cliente asociado (falta vincular auth_user_id)." };
-  }
-  return { data };
+  if(vista === "hist") return cargarHistorial(cliente);
+  if(vista === "sug") return cargarSugerencias(cliente);
+  if(vista === "nov") return cargarNovedades(cliente);
 }
 
-async function getClienteByCode(codCliente) {
-  const { data, error } = await sb
-    .from("customers")
-    .select("cod_cliente, business_name")
-    .eq("cod_cliente", String(codCliente))
-    .maybeSingle();
+// ====================== HISTORIAL ======================
+async function cargarHistorial(cliente){
+  const { data, error } = await sb.rpc("pivot_cliente_mensual", { p_customer: cliente });
+  if(error){ alert(error.message); return; }
+  if(!data || !data.length){ alert("Sin datos"); return; }
 
-  if (error) {
-    console.error("getClienteByCode error:", error);
-    return { error: "No se pudo cargar el cliente por código (RLS o datos)." };
-  }
-  if (!data) return { error: "No existe ese cod_cliente." };
-  return { data };
-}
+  const months = data[0].months_order || [];
+  const thead = document.querySelector("#tablaHist thead");
+  const tbody = document.querySelector("#tablaHist tbody");
 
-async function getSales(codCliente) {
-  const { data, error } = await sb
-    .from("sales_lines")
-    .select("invoice_date, item_code, boxes")
-    .eq("customer_code", String(codCliente))
-    .order("invoice_date", { ascending: true });
-
-  if (error) {
-    console.error("getSales error:", error);
-    return { error: "Error cargando ventas (RLS o datos)." };
-  }
-  return { data: data || [] };
-}
-
-// ---------- tabla (meses robustos) ----------
-function ymKey(d) {
-  return d.getFullYear() * 12 + d.getMonth(); // entero ordenable
-}
-function ymLabel(k) {
-  const y = Math.floor(k / 12);
-  const m = k % 12;
-  return new Date(y, m, 1).toLocaleString("es-AR", { month: "short", year: "numeric" });
-}
-
-// Cache para que NO se “vacíe” al cambiar de pestaña del navegador
-let LAST_RENDER = null; // {theadHTML, tbodyHTML, clienteText, statusHidden, tablaDisplay}
-let LAST_CLIENT_CODE = null;
-let LAST_IS_ADMIN = false;
-
-function saveRenderCache() {
-  LAST_RENDER = {
-    theadHTML: thead.innerHTML,
-    tbodyHTML: tbody.innerHTML,
-    clienteText: $("cliente").innerText,
-    statusHidden: statusBox.style.display === "none",
-    tablaDisplay: tabla.style.display
-  };
-}
-
-function restoreRenderCache() {
-  if (!LAST_RENDER) return false;
-  thead.innerHTML = LAST_RENDER.theadHTML;
-  tbody.innerHTML = LAST_RENDER.tbodyHTML;
-  $("cliente").innerText = LAST_RENDER.clienteText;
-
-  statusBox.style.display = LAST_RENDER.statusHidden ? "none" : "block";
-  tabla.style.display = LAST_RENDER.tablaDisplay || "table";
-  return true;
-}
-
-function renderTabla(rows) {
-  if (!rows.length) {
-    setStatus("Sin datos");
-    saveRenderCache();
-    return;
-  }
-
-  const mesesSet = new Set();
-  rows.forEach((r) => {
-    if (!r.invoice_date) return;
-    const d = new Date(r.invoice_date);
-    if (Number.isNaN(d.getTime())) return;
-    mesesSet.add(ymKey(d));
-  });
-
-  const meses = Array.from(mesesSet).sort((a, b) => a - b);
-
-  const map = {};
-  rows.forEach((r) => {
-    const item = r.item_code || "";
-    const boxes = Number(r.boxes) || 0;
-    const d = new Date(r.invoice_date);
-    if (Number.isNaN(d.getTime())) return;
-    const key = ymKey(d);
-
-    if (!map[item]) map[item] = { desc: item, total: 0, meses: {} };
-    map[item].total += boxes;
-    map[item].meses[key] = (map[item].meses[key] || 0) + boxes;
-  });
-
-  const arr = Object.entries(map)
-    .map(([cod, v]) => ({ cod, ...v }))
-    .sort((a, b) => b.total - a.total);
-
-  thead.innerHTML = "";
-  const trh = document.createElement("tr");
-  ["Código", "Descripción", "Total"].forEach((t) => {
-    const th = document.createElement("th");
-    th.innerText = t;
-    trh.appendChild(th);
-  });
-
-  meses.forEach((k) => {
-    const th = document.createElement("th");
-    th.innerText = ymLabel(k);
-    trh.appendChild(th);
-  });
-
-  thead.appendChild(trh);
+  thead.innerHTML = `
+    <tr>
+      <th>Cod</th>
+      <th>Descripción</th>
+      <th>Foto</th>
+      <th>Total</th>
+      ${months.map(m=>`<th>${fmtMes(m)}</th>`).join("")}
+    </tr>`;
 
   tbody.innerHTML = "";
-  arr.forEach((p) => {
-    const tr = document.createElement("tr");
 
-    const tdCod = document.createElement("td");
-    tdCod.innerText = p.cod;
-    tr.appendChild(tdCod);
+  data.forEach(r=>{
+    const cod = pick(r,["cod","codigo"]);
+    const desc = pick(r,["description","descripcion","articulo"]);
 
-    const tdDesc = document.createElement("td");
-    tdDesc.innerText = p.desc;
-    tdDesc.className = "desc";
-    tr.appendChild(tdDesc);
+    tbody.innerHTML += `
+      <tr>
+        <td>${cod}</td>
+        <td>${desc}</td>
+        <td>${fotoCell(cod)}</td>
+        <td>${r.total || ""}</td>
+        ${months.map(m=>`<td>${r.by_month?.[m] || ""}</td>`).join("")}
+      </tr>`;
+  });
+}
 
-    const tdTotal = document.createElement("td");
-    tdTotal.innerText = p.total;
-    tr.appendChild(tdTotal);
+// ====================== SUGERENCIAS ======================
+async function cargarSugerencias(cliente){
+  const { data, error } = await sb.rpc("sugerencias_cliente",{p_customer:cliente});
 
-    meses.forEach((k) => {
-      const td = document.createElement("td");
-      td.innerText = p.meses[k] ? String(p.meses[k]) : "";
-      tr.appendChild(td);
+  console.log("SUG DATA COMPLETA:", data);
+  console.log("SUG PRIMER REGISTRO:", data?.[0]);
+
+  if(error){ alert(error.message); return; }
+
+  sugerenciasGlobal = data || [];
+  sugMostrados = 5;
+  renderSug();
+}
+
+function renderSug(){
+  const thead = document.querySelector("#tablaSug thead");
+  const tbody = document.querySelector("#tablaSug tbody");
+
+  thead.innerHTML = `
+    <tr>
+      <th>Cod</th>
+      <th>Descripción</th>
+      <th>Foto</th>
+      <th>UxB</th>
+      <th>Precio</th>
+      <th></th>
+    </tr>`;
+
+  tbody.innerHTML = "";
+
+  sugerenciasGlobal.slice(0,sugMostrados).forEach(r=>{
+    const cod = pick(r,["cod","codigo"]);
+    const desc = pick(r,["description","descripcion","articulo"]);
+    const uxb = pick(r,["uxb"]);
+    const price = pick(r,["price_cash","precio"]);
+
+    tbody.innerHTML += `
+      <tr>
+        <td>${cod}</td>
+        <td>${desc}</td>
+        <td>${fotoCell(cod)}</td>
+        <td>${uxb}</td>
+        <td>${fmtPrecio(price)}</td>
+        <td>${r.texto_clientes || ""}</td>
+      </tr>`;
+  });
+}
+
+// ====================== NOVEDADES ======================
+async function cargarNovedades(cliente){
+
+  let res = await sb.rpc("novedades_cliente",{
+    p_customer: cliente,
+    p_limit: 50,
+    p_min_clients: 10
+  });
+
+  if(res.error){
+    res = await sb.rpc("novedades_cliente",{
+      p_customer: cliente,
+      p_min_clients: 10
     });
+  }
 
-    tbody.appendChild(tr);
-  });
-
-  hideStatus();
-  tabla.style.display = "table";
-  saveRenderCache();
-}
-
-// ---------- flujo principal ----------
-async function loadForSession(session, forcedClientCode /* string | null */) {
-  setStatus("Cargando...");
-
-  const meRes = await getMeCustomer(session);
-  if (meRes.error) {
-    setStatus(meRes.error);
-    showLogin(meRes.error);
+  if(res.error){
+    alert(res.error.message);
     return;
   }
 
-  const me = meRes.data;
-  const admin = isAdminRow(me);
-
-  LAST_IS_ADMIN = admin;
-
-  // mostrar admin box si corresponde
-  adminBox.style.display = admin ? "block" : "none";
-  adminMsg.innerText = admin ? "Modo admin: podés cargar cualquier cliente por cod_cliente." : "";
-
-  // qué cliente cargar
-  let targetCode = forcedClientCode ? String(forcedClientCode) : String(me.cod_cliente);
-  let targetName = me.business_name;
-
-  // si admin pide otro
-  if (admin && forcedClientCode && String(forcedClientCode) !== String(me.cod_cliente)) {
-    const cliRes = await getClienteByCode(forcedClientCode);
-    if (cliRes.error) {
-      setStatus(cliRes.error);
-      return;
-    }
-    targetCode = String(cliRes.data.cod_cliente);
-    targetName = cliRes.data.business_name;
-  }
-
-  LAST_CLIENT_CODE = targetCode;
-
-  $("cliente").innerText = `Cliente: ${targetName} (${targetCode})`;
-
-  const salesRes = await getSales(targetCode);
-  if (salesRes.error) {
-    setStatus(salesRes.error);
-    return;
-  }
-
-  renderTabla(salesRes.data);
+  novedadesGlobal = res.data || [];
+  novMostrados = 5;
+  renderNov();
 }
 
-// ---------- eventos ----------
-function bindUI() {
-  btnLogin?.addEventListener("click", doLogin);
-  btnLogout?.addEventListener("click", doLogout);
+function renderNov(){
+  const thead = document.querySelector("#tablaNov thead");
+  const tbody = document.querySelector("#tablaNov tbody");
 
-  passInput?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") doLogin();
-  });
+  thead.innerHTML = `
+    <tr>
+      <th>Cod</th>
+      <th>Descripción</th>
+      <th>Foto</th>
+      <th>UxB</th>
+      <th>Precio</th>
+    </tr>`;
 
-  // Tabs internas
-  tabHist?.addEventListener("click", () => setTab("hist"));
-  tabSug?.addEventListener("click", () => setTab("sug"));
-  tabNov?.addEventListener("click", () => setTab("nov"));
+  tbody.innerHTML = "";
 
-  // Admin: cargar cliente
-  btnLoadClient?.addEventListener("click", async () => {
-    const code = (adminClientCode.value || "").trim();
-    if (!code) {
-      adminMsg.innerText = "Ingresá un cod_cliente.";
-      return;
-    }
-    adminMsg.innerText = "";
-    const s = await getSessionSafe();
-    if (!s) {
-      showLogin("Ingresá para ver tu historial.");
-      return;
-    }
-    hideLogin();
-    await loadForSession(s, code);
-  });
+  novedadesGlobal.slice(0,novMostrados).forEach(r=>{
+    const cod = pick(r,["cod","codigo"]);
+    const desc = pick(r,["description","descripcion","articulo"]);
+    const uxb = pick(r,["uxb"]);
+    const price = pick(r,["price_cash","precio"]);
 
-  // FIX: al volver a la pestaña del navegador, restauramos info sin recargar
-  document.addEventListener("visibilitychange", async () => {
-    if (document.visibilityState !== "visible") return;
-
-    // 1) si la UI quedó “vacía” pero tenemos cache, restauramos rápido
-    const hadCache = restoreRenderCache();
-
-    // 2) re-chequeo sesión; si hay sesión, y la tabla quedó oculta, recargamos suave
-    const s = await getSessionSafe();
-    if (!s) return;
-
-    hideLogin();
-
-    // Si el cache no estaba, o si tabla quedó oculta, o si te interesa refrescar:
-    if (!hadCache || tabla.style.display === "none") {
-      await loadForSession(s, LAST_IS_ADMIN ? LAST_CLIENT_CODE : null);
-    }
+    tbody.innerHTML += `
+      <tr>
+        <td>${cod}</td>
+        <td>${desc}</td>
+        <td>${fotoCell(cod)}</td>
+        <td>${uxb}</td>
+        <td>${fmtPrecio(price)}</td>
+      </tr>`;
   });
 }
 
-async function init() {
-  bindUI();
-  setTab("hist");
-
-  const session = await getSessionSafe();
-
-  if (!session) {
-    setStatus("Ingresá para ver tu historial.");
-    showLogin("");
-    return;
-  }
-
-  hideLogin();
-  await loadForSession(session, null);
-
-  // cambios de sesión
-  sb.auth.onAuthStateChange(async (_event, newSession) => {
-    if (!newSession) {
-      $("cliente").innerText = "";
-      setStatus("Ingresá para ver tu historial.");
-      showLogin("");
-      return;
-    }
-    hideLogin();
-    await loadForSession(newSession, LAST_IS_ADMIN ? LAST_CLIENT_CODE : null);
-  });
-}
-
-document.addEventListener("DOMContentLoaded", init);
-
+// ====================== INIT ======================
+mostrar("hist");
