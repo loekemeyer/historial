@@ -1,132 +1,141 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Historial de compras</title>
+<meta charset="UTF-8">
+<title>Historial de Compras</title>
 
-  <!-- Supabase (UMD) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- jsPDF + AutoTable para exportar PDF -->
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js"></script>
+<style>
+body{
+  font-family: Arial;
+  background:#f4f4f4;
+  padding:30px;
+}
 
-  <!-- 1) TU CSS PRINCIPAL (ideal): poné acá el mismo CSS de tu sitio principal.
-       Si no querés, podés comentar esta línea. -->
-  <!-- <link rel="stylesheet" href="PEGAR_ACA_TU_CSS_PRINCIPAL.css"> -->
+.card{
+  background:white;
+  padding:25px;
+  border-radius:10px;
+  max-width:1200px;
+  margin:auto;
+  box-shadow:0 0 10px rgba(0,0,0,.1);
+}
 
-  <!-- 2) CSS mínimo SOLO para tabla/tabs/pequeños ajustes -->
-  <link rel="stylesheet" href="./historial.css" />
+h1{margin:0 0 10px}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:20px;
+}
+
+th{
+  background:#111827;
+  color:white;
+  padding:10px;
+  font-size:14px;
+}
+
+td{
+  padding:8px;
+  border-bottom:1px solid #ddd;
+  text-align:center;
+}
+
+td.desc{text-align:left}
+
+/* --- agregado mínimo para login (mantiene estética simple) --- */
+.login{
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafafa;
+}
+.login-row{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:flex-end;
+}
+.login-col{
+  flex: 1 1 220px;
+  min-width: 220px;
+}
+label{ display:block; font-size:12px; color:#555; margin-bottom:6px; font-weight:bold; }
+input{
+  width:100%;
+  padding:10px;
+  border:1px solid #ddd;
+  border-radius:8px;
+  font-size:14px;
+}
+.btn{
+  padding:10px 12px;
+  border-radius:8px;
+  border:1px solid #ddd;
+  background:white;
+  font-weight:bold;
+  cursor:pointer;
+}
+.btn.primary{
+  background:#111827;
+  color:white;
+  border-color:#111827;
+}
+.small{
+  font-size:12px;
+  color:#666;
+  margin-top:8px;
+}
+.right{
+  display:flex;
+  gap:10px;
+  justify-content:flex-end;
+  align-items:center;
+  flex-wrap:wrap;
+}
+</style>
 </head>
 
 <body>
-  <div class="wrap">
-    <header class="header">
-      <div class="header-left">
-        <h1 class="h1">Historial de compras</h1>
-        <div id="sub" class="sub">Ingresá para ver tu historial.</div>
-      </div>
 
-      <div class="header-right">
-        <button id="btnLogout" class="btn hidden" type="button">Salir</button>
-      </div>
-    </header>
-
-    <!-- LOGIN -->
-    <section id="loginBox" class="card">
-      <div class="row">
-        <div class="col">
-          <label>Email</label>
-          <input id="email" type="email" autocomplete="username" placeholder="tu@email.com" />
-        </div>
-        <div class="col">
-          <label>Contraseña</label>
-          <input id="pass" type="password" autocomplete="current-password" placeholder="********" />
-        </div>
-      </div>
-
-      <div class="row row-actions">
-        <button id="btnLogin" class="btn primary" type="button">Ingresar</button>
-        <button id="btnReset" class="btn" type="button">Olvidé mi contraseña</button>
-        <div id="loginMsg" class="msg"></div>
-      </div>
-    </section>
-
-    <!-- APP -->
-    <section id="app" class="hidden">
-      <!-- Tabs (3 pestañas separadas como pediste) -->
-      <nav class="tabs">
-        <button id="tabHist" class="tab active" type="button">Historial</button>
-        <button id="tabSug" class="tab" type="button">Sugerencias</button>
-        <button id="tabNov" class="tab" type="button">Novedades</button>
-      </nav>
-
-      <!-- Panel superior (acciones) -->
-      <section class="card">
-        <div class="top-actions">
-          <div>
-            <div class="k">Cliente actual</div>
-            <div id="clienteActual" class="v">—</div>
-          </div>
-
-          <div class="actions">
-            <!-- Solo visible si admin -->
-            <div id="adminBox" class="admin hidden">
-              <label>Ver cliente (cod_cliente)</label>
-              <input id="adminClientCode" type="text" placeholder="Ej: 777" />
-              <button id="btnLoadClient" class="btn" type="button">Cargar</button>
-            </div>
-
-            <label class="inline">
-              <span>Rango</span>
-              <select id="rangeYears">
-                <option value="1">1 año</option>
-                <option value="3">3 años</option>
-                <option value="5" selected>5 años</option>
-                <option value="10">10 años</option>
-              </select>
-            </label>
-
-            <button id="btnReload" class="btn" type="button">Actualizar</button>
-            <button id="btnPdf" class="btn" type="button">Descargar PDF</button>
-          </div>
-        </div>
-
-        <div id="status" class="msg">—</div>
-      </section>
-
-      <!-- HISTORIAL -->
-      <section id="panelHist" class="card">
-        <!-- Referencia clara: este panel muestra la tabla agrupada por item y meses -->
-        <div class="tablewrap">
-          <table id="tabla" class="table hidden">
-            <thead id="thead"></thead>
-            <tbody id="tbody"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- SUGERENCIAS -->
-      <section id="panelSug" class="card hidden">
-        <!-- Referencia clara: acá van sugerencias basadas en historial (reposiciones, combos, etc.) -->
-        <div class="placeholder">
-          <div class="ph-title">Sugerencias</div>
-          <div class="ph-text">Pendiente de conectar (por ejemplo: RPC/tabla "suggestions").</div>
-        </div>
-      </section>
-
-      <!-- NOVEDADES -->
-      <section id="panelNov" class="card hidden">
-        <!-- Referencia clara: acá van novedades (nuevos productos, promos, etc.) -->
-        <div class="placeholder">
-          <div class="ph-title">Novedades</div>
-          <div class="ph-text">Pendiente de conectar (por ejemplo: tabla "news" o Google Sheet).</div>
-        </div>
-      </section>
-    </section>
+<div class="card">
+  <div class="right">
+    <button id="btnLogout" class="btn" style="display:none" type="button">Cerrar sesión</button>
   </div>
 
-  <script src="./historial.js"></script>
+  <h1>Historial de compras</h1>
+  <div id="cliente"></div>
+
+  <!-- LOGIN (solo se muestra si NO hay sesión) -->
+  <div id="loginBox" class="login" style="display:none">
+    <div class="login-row">
+      <div class="login-col">
+        <label for="user">CUIT o Email</label>
+        <input id="user" type="text" placeholder="Ej: 30XXXXXXXXX o email@empresa.com" autocomplete="username">
+      </div>
+      <div class="login-col">
+        <label for="pass">Contraseña</label>
+        <input id="pass" type="password" placeholder="********" autocomplete="current-password">
+      </div>
+      <div class="login-col" style="flex:0 0 auto; min-width:auto">
+        <button id="btnLogin" class="btn primary" type="button">Ingresar</button>
+      </div>
+    </div>
+    <div class="small" id="loginMsg"></div>
+  </div>
+
+  <div id="status">Cargando...</div>
+
+  <table id="tabla" style="display:none">
+    <thead id="thead"></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<script src="historial.js"></script>
+
 </body>
 </html>
