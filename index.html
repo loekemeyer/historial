@@ -1,87 +1,104 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Historial de Compras</title>
+  <title>Historial de compras</title>
 
-  <!-- Supabase UMD v2 -->
+  <!-- Supabase (UMD) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+  <!-- jsPDF + AutoTable para exportar PDF -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- 1) TU CSS PRINCIPAL (ideal): poné acá el mismo CSS de tu sitio principal.
+       Si no querés, podés comentar esta línea. -->
+  <!-- <link rel="stylesheet" href="PEGAR_ACA_TU_CSS_PRINCIPAL.css"> -->
+
+  <!-- 2) CSS mínimo SOLO para tabla/tabs/pequeños ajustes -->
   <link rel="stylesheet" href="./historial.css" />
 </head>
 
 <body>
-  <!-- TOPBAR -->
-  <header class="topbar">
-    <div class="titlewrap">
-      <div class="title">Historial de compras</div>
-      <div class="subtitle" id="subtitle">Ingresá para ver tu historial</div>
-    </div>
+  <div class="wrap">
+    <header class="header">
+      <div class="header-left">
+        <h1 class="h1">Historial de compras</h1>
+        <div id="sub" class="sub">Ingresá para ver tu historial.</div>
+      </div>
 
-    <div class="topbar-actions">
-      <button id="btnLogout" class="btn btn-ghost hidden" type="button">Cerrar sesión</button>
-    </div>
-  </header>
+      <div class="header-right">
+        <button id="btnLogout" class="btn hidden" type="button">Salir</button>
+      </div>
+    </header>
 
-  <main class="container">
-    <!-- LOGIN CARD -->
-    <section id="loginCard" class="card">
-      <h2 class="h2">Iniciar sesión</h2>
-      <p class="muted">Usá el email y contraseña asociados a tu cuenta.</p>
-
-      <div class="form-grid">
-        <div class="field">
-          <label for="email">Email</label>
+    <!-- LOGIN -->
+    <section id="loginBox" class="card">
+      <div class="row">
+        <div class="col">
+          <label>Email</label>
           <input id="email" type="email" autocomplete="username" placeholder="tu@email.com" />
         </div>
-
-        <div class="field">
-          <label for="password">Contraseña</label>
-          <input id="password" type="password" autocomplete="current-password" placeholder="********" />
+        <div class="col">
+          <label>Contraseña</label>
+          <input id="pass" type="password" autocomplete="current-password" placeholder="********" />
         </div>
       </div>
 
-      <div class="form-actions">
-        <button id="btnLogin" class="btn btn-primary" type="button">Ingresar</button>
+      <div class="row row-actions">
+        <button id="btnLogin" class="btn primary" type="button">Ingresar</button>
         <button id="btnReset" class="btn" type="button">Olvidé mi contraseña</button>
+        <div id="loginMsg" class="msg"></div>
       </div>
-
-      <div id="loginStatus" class="status"></div>
     </section>
 
     <!-- APP -->
-    <section id="appWrap" class="hidden">
-      <div class="tabs">
-        <button id="tabHistorial" class="tab active" type="button">Historial</button>
-        <button id="tabNovedades" class="tab" type="button">Novedades y sugerencias</button>
-      </div>
+    <section id="app" class="hidden">
+      <!-- Tabs (3 pestañas separadas como pediste) -->
+      <nav class="tabs">
+        <button id="tabHist" class="tab active" type="button">Historial</button>
+        <button id="tabSug" class="tab" type="button">Sugerencias</button>
+        <button id="tabNov" class="tab" type="button">Novedades</button>
+      </nav>
 
-      <!-- HISTORIAL -->
-      <section id="panelHistorial" class="card">
-        <div class="row-between">
+      <!-- Panel superior (acciones) -->
+      <section class="card">
+        <div class="top-actions">
           <div>
-            <div class="kicker">Cliente</div>
-            <div id="cliente" class="cliente">—</div>
+            <div class="k">Cliente actual</div>
+            <div id="clienteActual" class="v">—</div>
           </div>
 
-          <div class="filters">
+          <div class="actions">
+            <!-- Solo visible si admin -->
+            <div id="adminBox" class="admin hidden">
+              <label>Ver cliente (cod_cliente)</label>
+              <input id="adminClientCode" type="text" placeholder="Ej: 777" />
+              <button id="btnLoadClient" class="btn" type="button">Cargar</button>
+            </div>
+
             <label class="inline">
               <span>Rango</span>
               <select id="rangeYears">
-                <option value="1">Último 1 año</option>
-                <option value="3">Últimos 3 años</option>
-                <option value="5" selected>Últimos 5 años</option>
-                <option value="10">Últimos 10 años</option>
+                <option value="1">1 año</option>
+                <option value="3">3 años</option>
+                <option value="5" selected>5 años</option>
+                <option value="10">10 años</option>
               </select>
             </label>
 
             <button id="btnReload" class="btn" type="button">Actualizar</button>
+            <button id="btnPdf" class="btn" type="button">Descargar PDF</button>
           </div>
         </div>
 
-        <div id="status" class="status">Cargando…</div>
+        <div id="status" class="msg">—</div>
+      </section>
 
+      <!-- HISTORIAL -->
+      <section id="panelHist" class="card">
+        <!-- Referencia clara: este panel muestra la tabla agrupada por item y meses -->
         <div class="tablewrap">
           <table id="tabla" class="table hidden">
             <thead id="thead"></thead>
@@ -90,22 +107,25 @@
         </div>
       </section>
 
-      <!-- NOVEDADES -->
-      <section id="panelNovedades" class="card hidden">
-        <h2 class="h2">Novedades y sugerencias</h2>
-        <p class="muted">
-          De momento este panel es un placeholder. Después lo conectamos a una tabla o endpoint
-          para mostrar: novedades, sugerencias por historial, reposición, etc.
-        </p>
+      <!-- SUGERENCIAS -->
+      <section id="panelSug" class="card hidden">
+        <!-- Referencia clara: acá van sugerencias basadas en historial (reposiciones, combos, etc.) -->
+        <div class="placeholder">
+          <div class="ph-title">Sugerencias</div>
+          <div class="ph-text">Pendiente de conectar (por ejemplo: RPC/tabla "suggestions").</div>
+        </div>
+      </section>
 
-        <div class="empty">
-          <div class="empty-icon">📰</div>
-          <div class="empty-title">Todavía no hay contenido</div>
-          <div class="empty-text">En el próximo paso lo armamos bien.</div>
+      <!-- NOVEDADES -->
+      <section id="panelNov" class="card hidden">
+        <!-- Referencia clara: acá van novedades (nuevos productos, promos, etc.) -->
+        <div class="placeholder">
+          <div class="ph-title">Novedades</div>
+          <div class="ph-text">Pendiente de conectar (por ejemplo: tabla "news" o Google Sheet).</div>
         </div>
       </section>
     </section>
-  </main>
+  </div>
 
   <script src="./historial.js"></script>
 </body>
