@@ -16,47 +16,60 @@ let sugMostrados = 5;
 let novMostrados = 5;
 
 // ====================== HELPERS ======================
-function pick(obj, keys, fallback = ""){
-  for(const k of keys){
-    if(obj && obj[k] !== undefined && obj[k] !== null && obj[k] !== "")
+function pick(obj, keys, fallback = "") {
+  for (const k of keys) {
+    if (obj && obj[k] !== undefined && obj[k] !== null && obj[k] !== "")
       return obj[k];
   }
   return fallback;
 }
 
-function fmtMes(yyyy_mm){
-  if(!yyyy_mm) return "";
+function fmtMes(yyyy_mm) {
+  if (!yyyy_mm) return "";
   const [yyyy, mm] = yyyy_mm.split("-");
   const meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-  return `${meses[Number(mm)-1]}/${yyyy.slice(-2)}`;
+  return `${meses[Number(mm) - 1]}/${yyyy.slice(-2)}`;
 }
 
-function fmtPrecio(n){
+function fmtPrecio(n) {
   const val = Number(n);
-  if(isNaN(val)) return "";
-  return val.toLocaleString("es-AR",{minimumFractionDigits:2});
+  if (isNaN(val)) return "";
+  return val.toLocaleString("es-AR", { minimumFractionDigits: 2 });
+}
+
+// ====================== % CLIENTES (valor) ======================
+function pctClientesValue(r) {
+  // si viene directo un porcentaje
+  const pctDirecto = Number(pick(r, ["pct_clientes","porcentaje_clientes","pct","porcentaje"], ""));
+  if (!isNaN(pctDirecto) && pctDirecto > 0) return pctDirecto;
+
+  // si viene buyers/total
+  const buyers = Number(pick(r, ["buyers","buyers_count","clientes_compraron","cant_clientes_compraron","n_buyers"], ""));
+  const total  = Number(pick(r, ["total_clients","total_clientes","clientes_total","n_total_clients"], ""));
+  if (!isNaN(buyers) && !isNaN(total) && total > 0) return (buyers / total) * 100;
+
+  return null;
 }
 
 // ====================== IMAGEN CORRECTA ======================
-function fotoCell(cod){
-  if(!cod) return "";
+function fotoCell(cod) {
+  if (!cod) return "";
 
   const { data } = sb.storage
     .from(IMG_BUCKET)
     .getPublicUrl(`${cod}.jpg`);
 
   const url = data?.publicUrl;
-
-  if(!url) return "";
+  if (!url) return "";
 
   return `
-    <a href="${url}" target="_blank">
+    <a href="${url}" target="_blank" rel="noopener">
       <img class="thumb" src="${url}" />
     </a>`;
 }
 
 // ====================== UI ======================
-function mostrar(which){
+function mostrar(which) {
   vista = which;
 
   document.getElementById("modHist").classList.toggle("hidden", which !== "hist");
@@ -68,20 +81,20 @@ function mostrar(which){
   document.getElementById("tabNov").classList.toggle("active", which === "nov");
 }
 
-async function cargar(){
+async function cargar() {
   const cliente = document.getElementById("cliente").value.trim();
-  if(!cliente) return;
+  if (!cliente) return;
 
-  if(vista === "hist") return cargarHistorial(cliente);
-  if(vista === "sug") return cargarSugerencias(cliente);
-  if(vista === "nov") return cargarNovedades(cliente);
+  if (vista === "hist") return cargarHistorial(cliente);
+  if (vista === "sug")  return cargarSugerencias(cliente);
+  if (vista === "nov")  return cargarNovedades(cliente);
 }
 
 // ====================== HISTORIAL ======================
-async function cargarHistorial(cliente){
+async function cargarHistorial(cliente) {
   const { data, error } = await sb.rpc("pivot_cliente_mensual", { p_customer: cliente });
-  if(error){ alert(error.message); return; }
-  if(!data || !data.length){ alert("Sin datos"); return; }
+  if (error) { alert(error.message); return; }
+  if (!data || !data.length) { alert("Sin datos"); return; }
 
   const months = data[0].months_order || [];
   const thead = document.querySelector("#tablaHist thead");
@@ -93,14 +106,14 @@ async function cargarHistorial(cliente){
       <th>Descripción</th>
       <th>Foto</th>
       <th>Total</th>
-      ${months.map(m=>`<th>${fmtMes(m)}</th>`).join("")}
+      ${months.map(m => `<th>${fmtMes(m)}</th>`).join("")}
     </tr>`;
 
   tbody.innerHTML = "";
 
-  data.forEach(r=>{
-    const cod = pick(r,["cod","codigo"]);
-    const desc = pick(r,["description","descripcion","articulo"]);
+  data.forEach(r => {
+    const cod = pick(r, ["cod","codigo"]);
+    const desc = pick(r, ["description","descripcion","articulo"]);
 
     tbody.innerHTML += `
       <tr>
@@ -108,85 +121,82 @@ async function cargarHistorial(cliente){
         <td>${desc}</td>
         <td>${fotoCell(cod)}</td>
         <td>${r.total || ""}</td>
-        ${months.map(m=>`<td>${r.by_month?.[m] || ""}</td>`).join("")}
+        ${months.map(m => `<td>${r.by_month?.[m] || ""}</td>`).join("")}
       </tr>`;
   });
 }
 
 // ====================== SUGERENCIAS ======================
-async function cargarSugerencias(cliente){
-  const { data, error } = await sb.rpc("sugerencias_cliente",{p_customer:cliente});
+async function cargarSugerencias(cliente) {
+  const { data, error } = await sb.rpc("sugerencias_cliente", { p_customer: cliente });
 
   console.log("SUG DATA COMPLETA:", data);
   console.log("SUG PRIMER REGISTRO:", data?.[0]);
 
-  if(error){ alert(error.message); return; }
+  if (error) { alert(error.message); return; }
 
   sugerenciasGlobal = data || [];
   sugMostrados = 5;
   renderSug();
 }
 
-function renderSug(){
+function renderSug() {
   const thead = document.querySelector("#tablaSug thead");
   const tbody = document.querySelector("#tablaSug tbody");
 
   thead.innerHTML = `
     <tr>
-      <th>Cod</th>
-      <th>Descripción</th>
-      <th>Foto</th>
-      <th>UxB</th>
-      <th>Precio</th>
-      <th></th>
+      <th class="col-cod">Cod</th>
+      <th class="col-desc">Descripción</th>
+      <th class="col-img">Foto</th>
+      <th class="col-uxb">UxB</th>
+      <th class="col-price">Precio</th>
+      <th class="col-note"></th>
     </tr>`;
 
   tbody.innerHTML = "";
 
-  sugerenciasGlobal.slice(0,sugMostrados).forEach(r=>{
-    const cod = pick(r,["cod","codigo"]);
-    const desc = pick(r,["description","descripcion","articulo"]);
-    const uxb = pick(r,["uxb"]);
-    const price = pick(r,["price_cash","precio"]);
+  sugerenciasGlobal.slice(0, sugMostrados).forEach(r => {
+    const cod = pick(r, ["cod","codigo"]);
+    const desc = pick(r, ["description","descripcion","articulo"]);
+    const uxb = pick(r, ["uxb"]);
+    const price = pick(r, ["price_cash","precio"]);
 
-    const pctTxt = pctClientesCell(r);
+    const pct = pctClientesValue(r);
+    const v = (pct === null) ? null : Math.round(pct);
+    const fuego = (v !== null && v >= 70) ? " 🔥" : "";
+    const nota = (v === null) ? "" : `El ${v}% de los clientes ya compró este producto${fuego}`;
 
     tbody.innerHTML += `
       <tr>
-        <td>${cod}</td>
-        <td>${desc}</td>
-        <td>${fotoCell(cod)}</td>
-        <td>${uxb}</td>
-        <td>${fmtPrecio(price)}</td>
-        <td>${pctTxt}</td>
-        <td>${r.texto_clientes || ""}</td>
+        <td class="col-cod">${cod}</td>
+        <td class="col-desc">${desc}</td>
+        <td class="col-img">${fotoCell(cod)}</td>
+        <td class="col-uxb">${uxb}</td>
+        <td class="col-price">${fmtPrecio(price)}</td>
+        <td class="col-note">${nota}</td>
       </tr>`;
   });
-    const info = document.getElementById("sugPctInfo");
-  if (info) {
-    const visibles = sugerenciasGlobal.slice(0, sugMostrados);
-    info.innerHTML = buildSugPctInfoHTML(visibles);
-  }
+
   syncMoreButtons();
 }
 
 // ====================== NOVEDADES ======================
-async function cargarNovedades(cliente){
-
-  let res = await sb.rpc("novedades_cliente",{
+async function cargarNovedades(cliente) {
+  let res = await sb.rpc("novedades_cliente", {
     p_customer: cliente,
     p_limit: 50,
     p_min_clients: 10
   });
 
-  if(res.error){
-    res = await sb.rpc("novedades_cliente",{
+  if (res.error) {
+    res = await sb.rpc("novedades_cliente", {
       p_customer: cliente,
       p_min_clients: 10
     });
   }
 
-  if(res.error){
+  if (res.error) {
     alert(res.error.message);
     return;
   }
@@ -196,7 +206,7 @@ async function cargarNovedades(cliente){
   renderNov();
 }
 
-function renderNov(){
+function renderNov() {
   const thead = document.querySelector("#tablaNov thead");
   const tbody = document.querySelector("#tablaNov tbody");
 
@@ -211,11 +221,11 @@ function renderNov(){
 
   tbody.innerHTML = "";
 
-  novedadesGlobal.slice(0,novMostrados).forEach(r=>{
-    const cod = pick(r,["cod","codigo"]);
-    const desc = pick(r,["description","descripcion","articulo"]);
-    const uxb = pick(r,["uxb"]);
-    const price = pick(r,["price_cash","precio"]);
+  novedadesGlobal.slice(0, novMostrados).forEach(r => {
+    const cod = pick(r, ["cod","codigo"]);
+    const desc = pick(r, ["description","descripcion","articulo"]);
+    const uxb = pick(r, ["uxb"]);
+    const price = pick(r, ["price_cash","precio"]);
 
     tbody.innerHTML += `
       <tr>
@@ -226,11 +236,9 @@ function renderNov(){
         <td>${fmtPrecio(price)}</td>
       </tr>`;
   });
+
   syncMoreButtons();
 }
-
-// ====================== INIT ======================
-mostrar("hist");
 
 // ====================== VER MAS / VER MENOS ======================
 function syncMoreButtons() {
@@ -252,7 +260,7 @@ function syncMoreButtons() {
 }
 
 function verMasSug() {
-  sugMostrados = sugerenciasGlobal.length; // mostrar todo
+  sugMostrados = sugerenciasGlobal.length;
   renderSug();
 }
 function verMenosSug() {
@@ -261,34 +269,12 @@ function verMenosSug() {
 }
 
 function verMasNov() {
-  novMostrados = novedadesGlobal.length; // mostrar todo
+  novMostrados = novedadesGlobal.length;
   renderNov();
 }
 function verMenosNov() {
   novMostrados = 5;
   renderNov();
-}
-
-// ====================== % CLIENTES (con 🔥) ======================
-function pctClientesCell(r) {
-  // Intento flexible: si tu RPC ya trae porcentaje directo, lo uso
-  const pctDirecto = Number(pick(r, ["pct_clientes","porcentaje_clientes","pct","porcentaje"], ""));
-  if (!isNaN(pctDirecto) && pctDirecto !== 0) {
-    const v = Math.round(pctDirecto);
-    return `${v}%${v >= 80 ? " 🔥" : ""}`;
-  }
-
-  // Si trae "cantidad que compraron" y "total clientes", calculo
-  const buyers = Number(pick(r, ["buyers","buyers_count","clientes_compraron","cant_clientes_compraron","n_buyers"], ""));
-  const total  = Number(pick(r, ["total_clients","total_clientes","clientes_total","n_total_clients"], ""));
-
-  if (!isNaN(buyers) && !isNaN(total) && total > 0) {
-    const v = Math.round((buyers / total) * 100);
-    return `${v}%${v >= 80 ? " 🔥" : ""}`;
-  }
-
-  // si no hay datos suficientes
-  return "";
 }
 
 // ====================== PDF (pestaña actual) ======================
@@ -309,7 +295,6 @@ function generarPdfActual() {
   const table = document.getElementById(tableId);
   if (!table) { alert("No se encontró la tabla para exportar."); return; }
 
-  // jsPDF UMD
   const { jsPDF } = window.jspdf || {};
   if (!jsPDF) { alert("No se cargó jsPDF. Revisá los <script> del HTML."); return; }
 
@@ -323,26 +308,23 @@ function generarPdfActual() {
   doc.setFontSize(10);
   doc.text(`Cliente: ${cliente || "(sin código)"}    Fecha: ${fecha}`, 40, 60);
 
-  // Extraer headers y filas desde el DOM (lo que el usuario está viendo)
   const headers = Array.from(table.querySelectorAll("thead th")).map(th => th.innerText.trim());
 
   const rows = Array.from(table.querySelectorAll("tbody tr")).map(tr => {
     const tds = Array.from(tr.querySelectorAll("td"));
     return tds.map(td => {
-      // si hay imagen, saco URL o vacío (no incrusto imagen en PDF para no hacerlo pesado)
       const img = td.querySelector("img");
-      if (img) return ""; // o img.src si querés que salga el link
+      if (img) return ""; // no incrusto imagen
       return (td.innerText || "").trim();
     });
   });
 
-  // AutoTable
   doc.autoTable({
     head: [headers],
     body: rows,
     startY: 80,
     styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak" },
-    headStyles: { fillColor: [17,17,17] }, // queda prolijo (negro)
+    headStyles: { fillColor: [17, 17, 17] },
     margin: { left: 40, right: 40 }
   });
 
@@ -350,3 +332,5 @@ function generarPdfActual() {
   doc.save(`${tituloVista}_${safeCliente}.pdf`);
 }
 
+// ====================== INIT ======================
+mostrar("hist");
