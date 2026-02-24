@@ -1,67 +1,112 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Historial de Compras</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Historial de Compras</title>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Supabase UMD v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<style>
-body{
-  font-family: Arial;
-  background:#f4f4f4;
-  padding:30px;
-}
-
-.card{
-  background:white;
-  padding:25px;
-  border-radius:10px;
-  max-width:1200px;
-  margin:auto;
-  box-shadow:0 0 10px rgba(0,0,0,.1);
-}
-
-h1{margin:0 0 10px}
-
-table{
-  width:100%;
-  border-collapse:collapse;
-  margin-top:20px;
-}
-
-th{
-  background:#111827;
-  color:white;
-  padding:10px;
-  font-size:14px;
-}
-
-td{
-  padding:8px;
-  border-bottom:1px solid #ddd;
-  text-align:center;
-}
-
-td.desc{text-align:left}
-</style>
+  <link rel="stylesheet" href="./historial.css" />
 </head>
 
 <body>
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="titlewrap">
+      <div class="title">Historial de compras</div>
+      <div class="subtitle" id="subtitle">Ingresá para ver tu historial</div>
+    </div>
 
-<div class="card">
-  <h1>Historial de compras</h1>
-  <div id="cliente"></div>
+    <div class="topbar-actions">
+      <button id="btnLogout" class="btn btn-ghost hidden" type="button">Cerrar sesión</button>
+    </div>
+  </header>
 
-  <div id="status">Cargando...</div>
+  <main class="container">
+    <!-- LOGIN CARD -->
+    <section id="loginCard" class="card">
+      <h2 class="h2">Iniciar sesión</h2>
+      <p class="muted">Usá el email y contraseña asociados a tu cuenta.</p>
 
-  <table id="tabla" style="display:none">
-    <thead id="thead"></thead>
-    <tbody id="tbody"></tbody>
-  </table>
-</div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" autocomplete="username" placeholder="tu@email.com" />
+        </div>
 
-<script src="historial.js"></script>
+        <div class="field">
+          <label for="password">Contraseña</label>
+          <input id="password" type="password" autocomplete="current-password" placeholder="********" />
+        </div>
+      </div>
 
+      <div class="form-actions">
+        <button id="btnLogin" class="btn btn-primary" type="button">Ingresar</button>
+        <button id="btnReset" class="btn" type="button">Olvidé mi contraseña</button>
+      </div>
+
+      <div id="loginStatus" class="status"></div>
+    </section>
+
+    <!-- APP -->
+    <section id="appWrap" class="hidden">
+      <div class="tabs">
+        <button id="tabHistorial" class="tab active" type="button">Historial</button>
+        <button id="tabNovedades" class="tab" type="button">Novedades y sugerencias</button>
+      </div>
+
+      <!-- HISTORIAL -->
+      <section id="panelHistorial" class="card">
+        <div class="row-between">
+          <div>
+            <div class="kicker">Cliente</div>
+            <div id="cliente" class="cliente">—</div>
+          </div>
+
+          <div class="filters">
+            <label class="inline">
+              <span>Rango</span>
+              <select id="rangeYears">
+                <option value="1">Último 1 año</option>
+                <option value="3">Últimos 3 años</option>
+                <option value="5" selected>Últimos 5 años</option>
+                <option value="10">Últimos 10 años</option>
+              </select>
+            </label>
+
+            <button id="btnReload" class="btn" type="button">Actualizar</button>
+          </div>
+        </div>
+
+        <div id="status" class="status">Cargando…</div>
+
+        <div class="tablewrap">
+          <table id="tabla" class="table hidden">
+            <thead id="thead"></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- NOVEDADES -->
+      <section id="panelNovedades" class="card hidden">
+        <h2 class="h2">Novedades y sugerencias</h2>
+        <p class="muted">
+          De momento este panel es un placeholder. Después lo conectamos a una tabla o endpoint
+          para mostrar: novedades, sugerencias por historial, reposición, etc.
+        </p>
+
+        <div class="empty">
+          <div class="empty-icon">📰</div>
+          <div class="empty-title">Todavía no hay contenido</div>
+          <div class="empty-text">En el próximo paso lo armamos bien.</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="./historial.js"></script>
 </body>
 </html>
