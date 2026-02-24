@@ -45,32 +45,15 @@ td{
 
 td.desc{text-align:left}
 
-/* --- agregado mínimo para login (mantiene estética simple) --- */
-.login{
-  margin-top: 14px;
-  padding: 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: #fafafa;
-}
-.login-row{
+/* --- agregado mínimo (mantiene estética simple) --- */
+.right{
   display:flex;
   gap:10px;
+  justify-content:flex-end;
+  align-items:center;
   flex-wrap:wrap;
-  align-items:flex-end;
 }
-.login-col{
-  flex: 1 1 220px;
-  min-width: 220px;
-}
-label{ display:block; font-size:12px; color:#555; margin-bottom:6px; font-weight:bold; }
-input{
-  width:100%;
-  padding:10px;
-  border:1px solid #ddd;
-  border-radius:8px;
-  font-size:14px;
-}
+
 .btn{
   padding:10px 12px;
   border-radius:8px;
@@ -79,22 +62,99 @@ input{
   font-weight:bold;
   cursor:pointer;
 }
+
 .btn.primary{
   background:#111827;
   color:white;
   border-color:#111827;
 }
+
 .small{
   font-size:12px;
   color:#666;
   margin-top:8px;
 }
-.right{
+
+.login{
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.login-row{
   display:flex;
   gap:10px;
-  justify-content:flex-end;
-  align-items:center;
   flex-wrap:wrap;
+  align-items:flex-end;
+}
+
+.login-col{
+  flex: 1 1 220px;
+  min-width: 220px;
+}
+
+label{ display:block; font-size:12px; color:#555; margin-bottom:6px; font-weight:bold; }
+
+input{
+  width:100%;
+  padding:10px;
+  border:1px solid #ddd;
+  border-radius:8px;
+  font-size:14px;
+}
+
+/* Tabs internas */
+.tabs{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top: 14px;
+}
+
+.tab{
+  padding:10px 12px;
+  border-radius:999px;
+  border:1px solid #ddd;
+  background:white;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+.tab.active{
+  background:#111827;
+  color:white;
+  border-color:#111827;
+}
+
+.panel{ display:none; }
+.panel.active{ display:block; }
+
+.hr{
+  height:1px;
+  background:#eee;
+  margin:14px 0;
+}
+
+/* Admin selector */
+.admin-box{
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafafa;
+  display:none;
+}
+.admin-row{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:flex-end;
+}
+.admin-row .admin-col{
+  flex: 0 0 260px;
+  min-width: 220px;
 }
 </style>
 </head>
@@ -127,15 +187,56 @@ input{
     <div class="small" id="loginMsg"></div>
   </div>
 
+  <!-- Admin selector (solo visible si admin) -->
+  <div id="adminBox" class="admin-box">
+    <div class="admin-row">
+      <div class="admin-col">
+        <label for="adminClientCode">Ver historial de (cod_cliente)</label>
+        <input id="adminClientCode" type="text" placeholder="Ej: 777">
+      </div>
+      <div class="admin-col" style="flex:0 0 auto; min-width:auto">
+        <button id="btnLoadClient" class="btn" type="button">Cargar</button>
+      </div>
+      <div class="admin-col" style="flex:1 1 260px; min-width:260px">
+        <div class="small" id="adminMsg"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs internas -->
+  <div class="tabs">
+    <button id="tabHist" class="tab active" type="button">Historial</button>
+    <button id="tabSug" class="tab" type="button">Sugerencias</button>
+    <button id="tabNov" class="tab" type="button">Novedades</button>
+  </div>
+
+  <div class="hr"></div>
+
   <div id="status">Cargando...</div>
 
-  <table id="tabla" style="display:none">
-    <thead id="thead"></thead>
-    <tbody id="tbody"></tbody>
-  </table>
+  <!-- Panel HISTORIAL -->
+  <div id="panelHist" class="panel active">
+    <table id="tabla" style="display:none">
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Panel SUGERENCIAS -->
+  <div id="panelSug" class="panel">
+    <div class="small">
+      Placeholder: acá después conectamos sugerencias (por ejemplo por reposición o compras repetidas).
+    </div>
+  </div>
+
+  <!-- Panel NOVEDADES -->
+  <div id="panelNov" class="panel">
+    <div class="small">
+      Placeholder: acá después conectamos novedades (productos nuevos, promos, etc.).
+    </div>
+  </div>
 </div>
 
 <script src="historial.js"></script>
-
 </body>
 </html>
