@@ -1,242 +1,245 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Historial de Compras</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js"></script>
+  <title>Historial de compras</title>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Supabase (UMD) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
-<style>
-body{
-  font-family: Arial;
-  background:#f4f4f4;
-  padding:30px;
-}
+  <style>
+    *{box-sizing:border-box}
+    body{
+      font-family: Arial, system-ui;
+      background:#f4f4f4;
+      padding:24px;
+      margin:0;
+    }
 
-.card{
-  background:white;
-  padding:25px;
-  border-radius:10px;
-  max-width:1200px;
-  margin:auto;
-  box-shadow:0 0 10px rgba(0,0,0,.1);
-}
+    .box{
+      background:#fff;
+      padding:18px;
+      border-radius:12px;
+      max-width:1200px;
+      margin:auto;
+      border:1px solid #e6e6e6;
+    }
 
-h1{margin:0 0 10px}
+    h2{margin:0 0 12px}
 
-table{
-  width:100%;
-  border-collapse:collapse;
-  margin-top:20px;
-}
+    .top{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-bottom:10px;
+    }
 
-th{
-  background:#111827;
-  color:white;
-  padding:10px;
-  font-size:14px;
-}
+    .switch{display:flex;gap:6px}
 
-td{
-  padding:8px;
-  border-bottom:1px solid #ddd;
-  text-align:center;
-}
+    .tab{
+      padding:8px 14px;
+      border-radius:10px;
+      border:1px solid #ccc;
+      background:#eee;
+      color:#333;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .tab.active{
+      background:#111;
+      color:#fff;
+      border-color:#111;
+    }
 
-td.desc{text-align:left}
+    .controls{
+      
+      display:flex;
+      gap:6px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    
 
-/* --- agregado mínimo (mantiene estética simple) --- */
-.right{
-  display:flex;
-  gap:10px;
-  justify-content:flex-end;
-  align-items:center;
-  flex-wrap:wrap;
-}
+    input{
+      padding:8px;
+      width:140px;
+      border:1px solid #ccc;
+      border-radius:8px;
+    }
 
-.btn{
-  padding:10px 12px;
-  border-radius:8px;
-  border:1px solid #ddd;
-  background:white;
-  font-weight:bold;
-  cursor:pointer;
-}
+    button{
+      padding:8px 12px;
+      border-radius:8px;
+      border:1px solid #ccc;
+      background:#111;
+      color:#fff;
+      cursor:pointer;
+    }
 
-.btn.primary{
-  background:#111827;
-  color:white;
-  border-color:#111827;
-}
+    .hidden{display:none}
 
-.small{
-  font-size:12px;
-  color:#666;
-  margin-top:8px;
-}
+    .tableWrap{
+      margin-top:12px;
+      border:1px solid #ddd;
+      border-radius:10px;
+      overflow:auto;
+      max-height:70vh;
+      background:#fff;
+    }
 
-.login{
-  margin-top: 14px;
-  padding: 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: #fafafa;
-}
+    table{
+      border-collapse:collapse;
+      table-layout:fixed; /* evita que se estire al pedo */
+    }
 
-.login-row{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  align-items:flex-end;
-}
+    /* Historial: puede ser ancho por meses */
+    #tablaHist{
+      width:max-content;
+      min-width:100%;
+      table-layout:auto;
+    }
 
-.login-col{
-  flex: 1 1 220px;
-  min-width: 220px;
-}
+    /* Sugerencias y Novedades: compactas */
+    #tablaSug, #tablaNov{
+      width:100%;
+      min-width:0;
+      table-layout:fixed;
+    }
 
-label{ display:block; font-size:12px; color:#555; margin-bottom:6px; font-weight:bold; }
+    th,td{
+      padding:6px 8px;
+      border-bottom:1px solid #eee;
+      font-size:13px;
+      white-space:nowrap;
+      vertical-align:middle;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
 
-input{
-  width:100%;
-  padding:10px;
-  border:1px solid #ddd;
-  border-radius:8px;
-  font-size:14px;
-}
+    thead th{
+      background:#111;
+      color:#fff;
+      position:sticky;
+      top:0;
+      z-index:2;
+    }
 
-/* Tabs internas */
-.tabs{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  margin-top: 14px;
-}
+    /* widths (compactas) */
+    .col-cod{width:70px; text-align:center}
 
-.tab{
-  padding:10px 12px;
-  border-radius:999px;
-  border:1px solid #ddd;
-  background:white;
-  font-weight:bold;
-  cursor:pointer;
-}
+    /* ✅ clave: hacemos Descripción más angosta para acercar “Foto” */
+    .col-desc{
+      width:240px;      /* antes 320 */
+      text-align:left;
+    }
 
-.tab.active{
-  background:#111827;
-  color:white;
-  border-color:#111827;
-}
+    /* ✅ Foto más cerca y más chica */
+    .col-img{width:60px; text-align:center}
 
-.panel{ display:none; }
-.panel.active{ display:block; }
+    /* mantenemos relación con Foto (como pediste) */
+    .col-uxb{width:70px; text-align:center}
+    .col-price{width:150px; text-align:center}
 
-.hr{
-  height:1px;
-  background:#eee;
-  margin:14px 0;
-}
+    /* Mensaje del % (Sugerencias) */
+    .col-msg{
+      width:320px;
+      text-align:left;
+      white-space:normal;
+      line-height:1.2;
+    }
 
-/* Admin selector */
-.admin-box{
-  margin-top: 10px;
-  padding: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: #fafafa;
-  display:none;
-}
-.admin-row{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  align-items:flex-end;
-}
-.admin-row .admin-col{
-  flex: 0 0 260px;
-  min-width: 220px;
-}
-</style>
+    .thumb{
+      height:28px;   /* antes 34 */
+      width:28px;    /* antes 34 */
+      object-fit:cover;
+      border-radius:6px;
+      border:1px solid #ddd;
+      display:inline-block;
+      background:#fafafa;
+    }
+
+    .moreWrap{
+      display:flex;
+      justify-content:center;
+      gap:8px;
+      margin-top:10px;
+    }
+
+    .muted{
+      color:#666;
+      font-size:12px;
+      margin-top:8px;
+    }
+  </style>
 </head>
 
 <body>
+  <div class="box">
 
-<div class="card">
-  <div class="right">
-    <button id="btnLogout" class="btn" style="display:none" type="button">Cerrar sesión</button>
-  </div>
+    <h2>Historial de compras</h2>
 
-  <h1>Historial de compras</h1>
-  <div id="cliente"></div>
-
-  <!-- LOGIN (solo se muestra si NO hay sesión) -->
-  <div id="loginBox" class="login" style="display:none">
-    <div class="login-row">
-      <div class="login-col">
-        <label for="user">CUIT o Email</label>
-        <input id="user" type="text" placeholder="Ej: 30XXXXXXXXX o email@empresa.com" autocomplete="username">
+    <div class="top">
+      <div class="switch">
+        <button id="tabHist" class="tab active" onclick="mostrar('hist')">Historial</button>
+        <button id="tabSug" class="tab" onclick="mostrar('sug')">Sugerencias</button>
+        <button id="tabNov" class="tab" onclick="mostrar('nov')">Novedades</button>
+        
       </div>
-      <div class="login-col">
-        <label for="pass">Contraseña</label>
-        <input id="pass" type="password" placeholder="********" autocomplete="current-password">
-      </div>
-      <div class="login-col" style="flex:0 0 auto; min-width:auto">
-        <button id="btnLogin" class="btn primary" type="button">Ingresar</button>
+
+      <div class="controls">
+        Código cliente:
+        <input id="cliente" value="1329" />
+        <button onclick="cargar()">Cargar</button>
+        <button id="btnPdf" onclick="generarPdfActual()" style="background:#444">PDF</button>
       </div>
     </div>
-    <div class="small" id="loginMsg"></div>
-  </div>
 
-  <!-- Admin selector (solo visible si admin) -->
-  <div id="adminBox" class="admin-box">
-    <div class="admin-row">
-      <div class="admin-col">
-        <label for="adminClientCode">Ver historial de (cod_cliente)</label>
-        <input id="adminClientCode" type="text" placeholder="Ej: 777">
+    <!-- HISTORIAL -->
+    <div id="modHist">
+      <div class="tableWrap">
+        <table id="tablaHist">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
       </div>
-      <div class="admin-col" style="flex:0 0 auto; min-width:auto">
-        <button id="btnLoadClient" class="btn" type="button">Cargar</button>
+      <div class="muted">Filas = artículos (ordenados por Total). Columnas = meses donde hubo compra.</div>
+    </div>
+
+    <!-- SUGERENCIAS -->
+    <div id="modSug" class="hidden">
+      <div class="tableWrap">
+        <table id="tablaSug">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
       </div>
-      <div class="admin-col" style="flex:1 1 260px; min-width:260px">
-        <div class="small" id="adminMsg"></div>
+
+      <div class="moreWrap">
+        <button id="btnMoreSug" class="hidden" onclick="verMasSug()">Ver más</button>
+        <button id="btnLessSug" class="hidden" onclick="verMenosSug()">Ver menos</button>
       </div>
     </div>
-  </div>
 
-  <!-- Tabs internas -->
-  <div class="tabs">
-    <button id="tabHist" class="tab active" type="button">Historial</button>
-    <button id="tabSug" class="tab" type="button">Sugerencias</button>
-    <button id="tabNov" class="tab" type="button">Novedades</button>
-  </div>
+    <!-- NOVEDADES -->
+    <div id="modNov" class="hidden">
+      <div class="tableWrap">
+        <table id="tablaNov">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
 
-  <div class="hr"></div>
-
-  <div id="status">Cargando...</div>
-
-  <!-- Panel HISTORIAL -->
-  <div id="panelHist" class="panel active">
-    <table id="tabla" style="display:none">
-      <thead id="thead"></thead>
-      <tbody id="tbody"></tbody>
-    </table>
-  </div>
-
-  <!-- Panel SUGERENCIAS -->
-  <div id="panelSug" class="panel">
-    <div class="small">
-      Placeholder: acá después conectamos sugerencias (por ejemplo por reposición o compras repetidas).
+      <div class="moreWrap">
+        <button id="btnMoreNov" class="hidden" onclick="verMasNov()">Ver más</button>
+        <button id="btnLessNov" class="hidden" onclick="verMenosNov()">Ver menos</button>
+      </div>
     </div>
-  </div>
 
-  <!-- Panel NOVEDADES -->
-  <div id="panelNov" class="panel">
-    <div class="small">
-      Placeholder: acá después conectamos novedades (productos nuevos, promos, etc.).
-    </div>
   </div>
-</div>
-
-<script src="historial.js"></script>
 </body>
 </html>
