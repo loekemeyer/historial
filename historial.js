@@ -165,7 +165,7 @@ function renderSug() {
     const pct = pctClientesValue(r);
     const v = (pct === null) ? null : Math.round(pct);
     const fuego = (v !== null && v >= 70) ? " 🔥" : "";
-    const nota = (v === null) ? "" : `El ${v}% de los clientes ya compró este producto${fuego}`;
+    const nota = (v === null) ? "" : `${fuego}${v}% de los clientes ya compró este producto`;
 
     tbody.innerHTML += `
       <tr>
@@ -334,3 +334,4 @@ function generarPdfActual() {
 
 // ====================== INIT ======================
 mostrar("hist");
+
