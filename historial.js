@@ -138,7 +138,6 @@ function renderSug(){
       <th>Foto</th>
       <th>UxB</th>
       <th>Precio</th>
-      <th>% Clientes</th>
       <th></th>
     </tr>`;
 
@@ -163,6 +162,11 @@ function renderSug(){
         <td>${r.texto_clientes || ""}</td>
       </tr>`;
   });
+    const info = document.getElementById("sugPctInfo");
+  if (info) {
+    const visibles = sugerenciasGlobal.slice(0, sugMostrados);
+    info.innerHTML = buildSugPctInfoHTML(visibles);
+  }
   syncMoreButtons();
 }
 
@@ -345,3 +349,4 @@ function generarPdfActual() {
   const safeCliente = (cliente || "cliente").replace(/[^\w\-]+/g, "_");
   doc.save(`${tituloVista}_${safeCliente}.pdf`);
 }
+
